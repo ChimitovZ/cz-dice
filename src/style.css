@@ -1,0 +1,97 @@
+:root {
+  color-scheme: dark;
+  --felt-deep: #0e2a1f;
+  --felt: #164332;
+  --felt-lit: #1d5a40;
+  --felt-edge: #0a1c15;
+  --ivory: #f3ecdc;
+  --ivory-shade: #d9d0bc;
+  --pip: #1a1714;
+  --ink: #f4efe6;
+  --muted: #c5d4cb;
+  --accent: #f0c35a;
+  --accent-ink: #1a1408;
+  --btn: #f3ecdc;
+  --btn-ink: #14241c;
+  --line: rgb(243 236 220 / 0.14);
+  --shadow: rgb(4 12 8 / 0.55);
+  --r: 14px;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --font: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", ui-rounded, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --felt-deep: #c8dcc8;
+    --felt: #8fb894;
+    --felt-lit: #a7c9a8;
+    --felt-edge: #5e8a66;
+    --ivory: #fffaf1;
+    --ivory-shade: #e7dec9;
+    --pip: #1c1916;
+    --ink: #142018;
+    --muted: #2d4636;
+    --accent: #b45309;
+    --accent-ink: #fff7ea;
+    --btn: #142018;
+    --btn-ink: #f7f1e6;
+    --line: rgb(20 32 24 / 0.16);
+    --shadow: rgb(40 60 44 / 0.28);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--felt-deep);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.16s !important;
+  }
+}
