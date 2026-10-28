@@ -9,26 +9,42 @@ let ro
 
 function fit() {
   const el = board.value
-  if (!el) return
+  const box = el?.parentElement
+  if (!el || !box) return
   const n = dice.count
-  const w = el.clientWidth
-  const h = el.clientHeight
-  const gap = 8
-  let best = 40
-  for (let cols = 1; cols <= n; cols++) {
-    const rows = Math.ceil(n / cols)
+  const tr = box.getBoundingClientRect()
+  const tp = getComputedStyle(box)
+  const bp = getComputedStyle(el)
+  const w =
+    tr.width -
+    parseFloat(tp.paddingLeft) -
+    parseFloat(tp.paddingRight) -
+    parseFloat(bp.paddingLeft) -
+    parseFloat(bp.paddingRight)
+  const h =
+    tr.height -
+    parseFloat(tp.paddingTop) -
+    parseFloat(tp.paddingBottom) -
+    parseFloat(bp.paddingTop) -
+    parseFloat(bp.paddingBottom)
+  if (w < 40 || h < 40) return
+  const pack = n >= 7 ? 12 : n
+  const gap = 10
+  let best = 24
+  for (let cols = 1; cols <= pack; cols++) {
+    const rows = Math.ceil(pack / cols)
     const cellW = (w - gap * (cols - 1)) / cols
     const cellH = (h - gap * (rows - 1)) / rows
-    const face = Math.min(cellW, cellH * 0.72)
+    const face = Math.min(cellW, (cellH - 6) / 1.5)
     if (face > best) best = face
   }
-  size.value = Math.max(44, Math.min(best, 128))
+  size.value = Math.floor(Math.min(best, 120))
 }
 
 onMounted(() => {
   fit()
   ro = new ResizeObserver(fit)
-  ro.observe(board.value)
+  ro.observe(board.value.parentElement)
 })
 watch(() => [dice.count, dice.historyOpen], () => nextTick(fit))
 onBeforeUnmount(() => ro?.disconnect())
@@ -52,9 +68,15 @@ onBeforeUnmount(() => ro?.disconnect())
   flex-wrap: wrap;
   justify-content: center;
   align-content: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 14px 14px 12px;
   min-height: 0;
+  overflow: hidden;
   cursor: pointer;
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+  .board { padding: 8px 12px; }
 }
 
 .board:focus-visible {

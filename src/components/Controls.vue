@@ -16,22 +16,31 @@ const dice = inject('dice')
 .ctrls {
   display: flex;
   align-items: stretch;
-  gap: 0.35rem;
+  gap: 0.28rem;
+  padding: 0.22rem 0.28rem;
+  border-radius: 12px;
+  border: 1px solid var(--gold-lo);
+  background: linear-gradient(180deg, #6e5728, #3a2d14);
+  box-shadow: inset 0 1px 0 rgb(245 215 110 / 0.35);
 }
 
 button {
-  width: 48px;
-  min-height: 48px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgb(0 0 0 / 0.18);
-  font-size: 1.55rem;
+  width: var(--chip);
+  min-height: var(--chip);
+  border: 1px solid var(--gold-hi);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #7a1b18 40%, transparent 41%),
+    repeating-conic-gradient(from 6deg, var(--gold-lo) 0 8deg, var(--gold-hi) 8deg 12deg);
+  color: var(--ivory);
+  font-size: 1.45rem;
   line-height: 1;
-  transition: transform 0.12s ease, background 0.12s ease;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+  transition: transform 0.12s ease;
 }
 
 button:hover:not(:disabled) {
-  background: rgb(0 0 0 / 0.28);
+  transform: scale(1.04);
 }
 
 button:active:not(:disabled) {
@@ -47,13 +56,10 @@ span {
   display: grid;
   place-items: center;
   text-align: center;
-  font-size: 1.35rem;
+  font-family: var(--font-num);
+  font-size: 1.2rem;
   font-weight: 700;
+  color: var(--gold-hi);
   font-variant-numeric: tabular-nums;
-}
-
-@media (prefers-color-scheme: light) {
-  button { background: rgb(255 255 255 / 0.38); }
-  button:hover:not(:disabled) { background: rgb(255 255 255 / 0.58); }
 }
 </style>

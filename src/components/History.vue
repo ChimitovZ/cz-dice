@@ -46,35 +46,45 @@ button {
 }
 
 .tog {
-  font-weight: 650;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
 }
 
 .clr {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 ul {
   margin: 0;
-  padding: 0;
+  padding: 0.2rem 0 0;
   list-style: none;
-  display: grid;
-  gap: 0.15rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
   max-height: 7.2rem;
   overflow: auto;
 }
 
 li {
   display: flex;
-  gap: 0.7rem;
+  gap: 0.35rem;
   align-items: baseline;
-  font-size: 0.92rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--gold-lo);
+  background: #1a1208;
+  font-size: 0.82rem;
   color: var(--muted);
 }
 
 b {
-  color: var(--accent);
-  font-size: 1.05rem;
-  min-width: 1.6rem;
+  color: var(--gold-hi);
+  font-family: var(--font-num);
+  font-size: 0.92rem;
+  min-width: 1.2rem;
   font-variant-numeric: tabular-nums;
 }
 
