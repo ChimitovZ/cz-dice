@@ -35,7 +35,10 @@ function cubesMark(n) {
 
 function onKey(e) {
   if (e.code !== 'Space' && e.code !== 'Enter') return
-  if (e.repeat) return
+  if (e.repeat || e.shiftKey) return
+  const tag = e.target?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+  if (dice.picker >= 0) return
   e.preventDefault()
   dice.roll()
 }
@@ -48,6 +51,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   <div class="app">
     <header class="top">
       <h1>Кубики</h1>
+      <p class="how">
+        <span><i class="dot tap" aria-hidden="true" />нажатие — переброс</span>
+        <span><i class="dot hold" aria-hidden="true" />зажать — грань</span>
+      </p>
     </header>
     <div
       class="table"
@@ -77,13 +84,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <span class="sum-lab">Сумма</span>
       <span class="sum-n">{{ dice.displaySum }}</span>
     </p>
-    <History />
-    <div class="dock">
-      <Controls />
-      <button class="throw" type="button" :disabled="dice.rolling" @click="dice.roll">
-        <span class="gleam" aria-hidden="true" />
-        Бросить
-      </button>
+    <Log class="feed" />
+    <div class="foot">
+      <div class="dock">
+        <Controls />
+        <button class="throw" type="button" :disabled="dice.rolling" @click="dice.roll">
+          <span class="gleam" aria-hidden="true" />
+          Бросить
+        </button>
+      </div>
+      <History />
     </div>
   </div>
 </template>
@@ -92,15 +102,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 .app {
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto 1fr auto auto auto;
-  gap: 0.45rem;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 0.4rem;
   padding: calc(0.55rem + var(--safe-t)) calc(0.7rem + var(--safe-r)) calc(0.55rem + var(--safe-b)) calc(0.7rem + var(--safe-l));
   background: radial-gradient(120% 70% at 50% 0%, #1a120c, var(--bg) 62%);
 }
 
 .top {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
 }
 
 h1 {
@@ -112,6 +125,40 @@ h1 {
   text-transform: uppercase;
   color: var(--gold-hi);
   text-shadow: 0 1px 0 var(--gold-lo), 0 0 10px rgb(212 175 55 / 0.28);
+}
+
+.how {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  color: rgb(215 197 138 / 0.68);
+}
+
+.how span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.dot.tap {
+  background: var(--gold-hi);
+}
+
+.dot.hold {
+  background: #7fd4a8;
+  box-shadow: 0 0 0 2px rgb(127 212 168 / 0.22);
 }
 
 .table {
@@ -282,6 +329,11 @@ h1 {
   pointer-events: none;
 }
 
+.foot {
+  display: grid;
+  gap: 0.15rem;
+}
+
 .dock {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -370,14 +422,24 @@ h1 {
 
 @media (max-width: 420px) {
   .felt-mark { display: none; }
+  .how {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.08rem;
+    font-size: 0.56rem;
+  }
   .edge.left,
   .edge.right { display: none; }
   .edge.top .bulb:nth-child(even),
   .edge.bot .bulb:nth-child(even) { display: none; }
 }
 
+@media (max-width: 360px) {
+  .how { display: none; }
+}
+
 @media (orientation: landscape) and (max-height: 480px) {
-  .app { gap: 0.28rem; }
+  .app { gap: 0.24rem; }
   .sum { width: min(100%, 12rem); padding: 0.22rem 0.7rem 0.28rem; }
   .sum-n { font-size: 1.7rem; }
   .throw { min-height: 48px; font-size: 1rem; border-radius: 14px; }
@@ -386,5 +448,6 @@ h1 {
   .table::before,
   .table.double::after { inset: 7px; }
   .rail { inset: 2px; }
+  .how { display: none; }
 }
 </style>
