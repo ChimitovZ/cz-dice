@@ -8,19 +8,11 @@ import History from './components/History.vue'
 const dice = useDice()
 provide('dice', dice)
 
-const tableWin = computed(() => {
-  if (dice.rolling) return false
-  const s = dice.shown
-  const same = s.length > 1 && s.every((v) => v === s[0])
-  const total = s.reduce((a, b) => a + b, 0)
-  return same || total === dice.count * 6
-})
+// Both flags come from the settled throw (see `outcome` in useDice), never
+// from the flickering faces: a lucky frame mid-roll must not flash the board.
+const tableWin = computed(() => !dice.rolling && dice.outcome.win)
 
-const tableDouble = computed(() => {
-  if (dice.rolling) return false
-  const s = dice.shown
-  return s.length > 1 && s.every((v) => v === s[0])
-})
+const tableDouble = computed(() => !dice.rolling && dice.outcome.double)
 
 function cubesMark(n) {
   const m = n % 10

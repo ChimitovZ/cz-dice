@@ -50,6 +50,9 @@ export function useDice() {
   const picker = ref(-1)
   // Token bumped only when a die is physically turned to a new face.
   const turn = ref(null)
+  // Settled result of the last throw. Never derived from the flickering
+  // `shown` faces, so a lucky frame mid-animation cannot celebrate early.
+  const outcome = ref({ win: false, double: false })
 
   const sum = computed(() => values.value.reduce((a, b) => a + b, 0))
 
@@ -100,6 +103,7 @@ export function useDice() {
     stopAnim()
     rolling.value = false
     picker.value = -1
+    outcome.value = { win: false, double: false }
     const before = [...values.value]
     const next = Array.from({ length: n }, (_, i) => values.value[i] ?? d6())
     count.value = n
@@ -124,12 +128,25 @@ export function useDice() {
     displaySum.value = sumNow
     rolling.value = false
     picker.value = -1
+    celebrate(next)
+  }
+
+  /**
+   * Decides whether the settled table deserves the lights. Called only with
+   * final faces — never with the flickering `shown` ones — so the flash
+   * can't fire on a random frame halfway through the toss.
+   */
+  function celebrate(faces) {
+    const same = faces.length > 1 && faces.every((v) => v === faces[0])
+    const totalAll = total(faces) === faces.length * 6
+    outcome.value = { win: same || totalAll, double: same }
   }
 
   function roll() {
     if (rolling.value) return
     stopAnim()
     picker.value = -1
+    outcome.value = { win: false, double: false }
     const before = [...values.value]
     const next = Array.from({ length: count.value }, d6)
     const sumNow = total(next)
@@ -167,6 +184,7 @@ export function useDice() {
     if (rolling.value || i < 0 || i >= count.value) return
     picker.value = -1
     stopAnim()
+    outcome.value = { win: false, double: false }
     const before = [...values.value]
     const next = [...before]
     next[i] = d6()
@@ -180,6 +198,7 @@ export function useDice() {
 
     if (reduceMotion()) {
       displaySum.value = sumNow
+      celebrate(next)
       return
     }
 
@@ -201,6 +220,7 @@ export function useDice() {
       stopAnim()
       shown.value = [...next]
       displaySum.value = sumNow
+      celebrate(next)
     }
     raf = requestAnimationFrame(tick)
   }
@@ -220,6 +240,7 @@ export function useDice() {
     pulse.value += 1
     buzz(8)
     commit({ kind: 'set', index: i, from: before, to: next })
+    celebrate(next)
   }
 
   function openPicker(i) {
@@ -250,6 +271,7 @@ export function useDice() {
     pulse,
     picker,
     turn,
+    outcome,
     min: MIN,
     max: MAX,
     inc: () => setCount(count.value + 1),
