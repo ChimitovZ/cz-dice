@@ -6,6 +6,7 @@ const KEY = 'cz-dice-count'
 const MIN = 1
 const MAX = 12
 const HIST = 20
+const TOSS_MS = 560
 
 function duration() {
   const buf = new Uint32Array(1)
@@ -28,7 +29,6 @@ function total(vals) {
 export function useDice() {
   const count = ref(2)
   const values = ref([5, 2])
-  const shown = ref([5, 2])
   const rolling = ref(false)
   // One journal for the whole game: every action records what changed and where.
   const history = ref([])
@@ -38,16 +38,13 @@ export function useDice() {
 
   // Single-die gestures: which die has its face picker open.
   const picker = ref(-1)
-  // Token bumped only when a die is physically turned to a new face.
-  const turn = ref(null)
-  // Settled result of the last throw. Never derived from the flickering
-  // `shown` faces, so a lucky frame mid-animation cannot celebrate early.
+  const motion = ref(null)
   const outcome = ref({ win: false, double: false })
 
   const sum = computed(() => values.value.reduce((a, b) => a + b, 0))
 
-  let raf = 0
-  let flicker = 0
+  let settleTimer = 0
+  let physicsReady = false
   let snd
 
   function playRoll() {
@@ -60,10 +57,6 @@ export function useDice() {
     navigator.vibrate?.(ms)
   }
 
-  /**
-   * Writes one row into the journal. `from`/`to` are the snapshots around
-   * the action, so the feed can say exactly which die moved and how.
-   */
   function commit(entry) {
     history.value = [
       {
@@ -79,10 +72,44 @@ export function useDice() {
   }
 
   function stopAnim() {
-    cancelAnimationFrame(raf)
-    clearInterval(flicker)
-    raf = 0
-    flicker = 0
+    clearTimeout(settleTimer)
+    motion.value = null
+  }
+
+  function cancelMotion(current) {
+    if (!current || motion.value !== current) return
+    stopAnim()
+    rolling.value = false
+    displaySum.value = sum.value
+  }
+
+  function settleMotion(current, faces = values.value) {
+    if (!current || motion.value !== current) return
+    stopAnim()
+    if (current.kind !== 'turn') finishRoll(current, faces)
+  }
+
+  function startMotion(entry, duration, instant = false) {
+    motion.value = { ...entry, duration, instant, physics: physicsReady }
+    const current = motion.value
+    if (!current.physics) settleTimer = setTimeout(() => settleMotion(current), duration)
+  }
+
+  function startRoll(entry, duration) {
+    const instant = reduceMotion()
+    playRoll()
+    if (!physicsReady) {
+      const next = values.value.map((value, index) =>
+        entry.kind === 'roll' || index === entry.index ? rollDie() : value,
+      )
+      if (instant) {
+        finishRoll(entry, next)
+        return
+      }
+      values.value = next
+    }
+    rolling.value = entry.kind === 'roll'
+    startMotion(entry, duration, instant)
   }
 
   function saveCount(n) {
@@ -106,7 +133,6 @@ export function useDice() {
     const next = Array.from({ length: n }, (_, i) => values.value[i] ?? rollDie())
     count.value = n
     values.value = next
-    shown.value = [...next]
     displaySum.value = total(next)
     if (persist) {
       saveCount(n)
@@ -120,20 +146,16 @@ export function useDice() {
     applyCount(next, true)
   }
 
-  function finish(next, sumNow) {
-    stopAnim()
-    shown.value = [...next]
-    displaySum.value = sumNow
+  function finishRoll({ kind, from, index }, faces) {
+    values.value = faces
+    displaySum.value = total(faces)
+    pulse.value += 1
     rolling.value = false
-    picker.value = -1
-    celebrate(next)
+    if (kind === 'roll') picker.value = -1
+    commit({ kind, index, from, to: faces })
+    celebrate(faces)
   }
 
-  /**
-   * Decides whether the settled table deserves the lights. Called only with
-   * final faces — never with the flickering `shown` ones — so the flash
-   * can't fire on a random frame halfway through the toss.
-   */
   function celebrate(faces) {
     const same = faces.length > 1 && faces.every((v) => v === faces[0])
     const totalAll = total(faces) === faces.length * 6
@@ -146,40 +168,13 @@ export function useDice() {
     picker.value = -1
     outcome.value = { win: false, double: false }
     const before = [...values.value]
-    const next = Array.from({ length: nextCount }, rollDie)
-    const sumNow = total(next)
     if (nextCount !== count.value) {
       count.value = nextCount
+      values.value = Array.from({ length: nextCount }, (_, index) => before[index] ?? 1)
       saveCount(nextCount)
     }
-    values.value = next
-    displaySum.value = sumNow
-    pulse.value += 1
-    playRoll()
     buzz(16)
-    commit({ kind: 'roll', from: before, to: next })
-
-    if (reduceMotion()) {
-      finish(next, sumNow)
-      return
-    }
-
-    rolling.value = true
-    shown.value = Array.from({ length: nextCount }, (_, index) => before[index] ?? rollDie())
-    const ms = duration()
-    const start = performance.now()
-    flicker = setInterval(() => {
-      shown.value = shown.value.map(() => rollDie())
-    }, 48)
-
-    const tick = (now) => {
-      if ((now - start) / ms < 1) {
-        raf = requestAnimationFrame(tick)
-        return
-      }
-      finish(next, sumNow)
-    }
-    raf = requestAnimationFrame(tick)
+    startRoll({ kind: 'roll', from: before }, TOSS_MS)
   }
 
   /** Rerolls one die only; the rest of the felt stays untouched. */
@@ -189,57 +184,22 @@ export function useDice() {
     stopAnim()
     outcome.value = { win: false, double: false }
     const before = [...values.value]
-    const next = [...before]
-    next[i] = rollDie()
-    const sumNow = total(next)
-    values.value = next
-    shown.value = [...next]
-    pulse.value += 1
-    playRoll()
     buzz(12)
-    commit({ kind: 'reroll', index: i, from: before, to: next })
-
-    if (reduceMotion()) {
-      displaySum.value = sumNow
-      celebrate(next)
-      return
-    }
-
-    // Flicker only this die, then settle on the new face.
-    const ms = Math.round(duration() * 0.8)
-    const start = performance.now()
-    let last = 0
-    const tick = (now) => {
-      if ((now - start) / ms < 1) {
-        if (now - last > 60) {
-          last = now
-          const f = shown.value.slice()
-          f[i] = rollDie()
-          shown.value = f
-        }
-        raf = requestAnimationFrame(tick)
-        return
-      }
-      stopAnim()
-      shown.value = [...next]
-      displaySum.value = sumNow
-      celebrate(next)
-    }
-    raf = requestAnimationFrame(tick)
+    startRoll({ kind: 'reroll', index: i, from: before }, Math.round(duration() * 0.8))
   }
 
   /** Turns one die to a hand-picked face (long-press picker). */
   function setFace(i, face) {
     if (rolling.value || i < 0 || i >= count.value) return
+    stopAnim()
     const before = [...values.value]
     const next = [...before]
     next[i] = clampFace(face)
     const sumNow = total(next)
     values.value = next
-    shown.value = [...next]
     displaySum.value = sumNow
     picker.value = -1
-    turn.value = { index: i, id: Date.now() + Math.random() }
+    if (!reduceMotion()) startMotion({ kind: 'turn', index: i, from: before }, 420)
     pulse.value += 1
     buzz(8)
     commit({ kind: 'set', index: i, from: before, to: next })
@@ -265,7 +225,6 @@ export function useDice() {
   return reactive({
     count,
     values,
-    shown,
     rolling,
     history,
     historyOpen,
@@ -273,7 +232,10 @@ export function useDice() {
     displaySum,
     pulse,
     picker,
-    turn,
+    motion,
+    cancelMotion,
+    settleMotion,
+    setPhysicsReady: (ready) => { physicsReady = ready },
     outcome,
     min: MIN,
     max: MAX,

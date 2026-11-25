@@ -1,0 +1,111 @@
+import { Body, Box, Plane, Vec3, World } from 'cannon-es'
+import { upperFace } from './faces.js'
+
+const STEP = 1 / 120
+const FLAT = Math.PI / 2
+const X = new Vec3(1, 0, 0)
+const Y = new Vec3(0, 1, 0)
+const CLEAR_UPPER_FACE = 0.74
+const REST_TIME = 0.16
+
+export function createTablePhysics(poses, moving, bounds, random = Math.random) {
+  const world = new World({ gravity: new Vec3(0, -27, 0), allowSleep: true })
+  world.defaultContactMaterial.friction = 0.4
+  world.defaultContactMaterial.restitution = 0.48
+  world.solver.iterations = 12
+
+  function addPlane(x, y, z, axis, angle) {
+    const surface = new Body({ shape: new Plane(), position: new Vec3(x, y, z) })
+    surface.quaternion.setFromAxisAngle(axis, angle)
+    world.addBody(surface)
+  }
+
+  addPlane(0, 0, 0, X, -FLAT)
+  addPlane(-bounds.halfWidth, 0, 0, Y, FLAT)
+  addPlane(bounds.halfWidth, 0, 0, Y, -FLAT)
+  addPlane(0, 0, bounds.back, Y, 0)
+  addPlane(0, 0, bounds.front, Y, Math.PI)
+
+  const direction = random() * 2 * Math.PI
+  const box = new Box(new Vec3(0.5, 0.5, 0.5))
+  const bodies = poses.map(({ position, quaternion }, index) => {
+    const active = moving.includes(index)
+    const body = new Body({
+      shape: box,
+      mass: active ? 1 : 0,
+      position: new Vec3(position.x, active ? 0.6 : position.y, position.z),
+      linearDamping: 0.34,
+      angularDamping: 0.46,
+      sleepSpeedLimit: 0.35,
+      sleepTimeLimit: 0.2,
+    })
+    body.quaternion.copy(quaternion)
+    body.previousQuaternion.copy(quaternion)
+    body.interpolatedQuaternion.copy(quaternion)
+    if (active) {
+      const angle = direction + (random() - 0.5) * 1.15
+      const speed = 5.2 + random() * 3.5
+      body.velocity.set(
+        Math.cos(angle) * speed - position.x * 1.05,
+        4.7 + random() * 1.6,
+        Math.sin(angle) * speed - position.z * 1.05,
+      )
+      const spin = 14 + random() * 10
+      const azimuth = random() * 2 * Math.PI
+      const vertical = 2 * random() - 1
+      const horizontal = Math.sqrt(1 - vertical * vertical)
+      body.angularVelocity.set(
+        spin * horizontal * Math.cos(azimuth), spin * vertical, spin * horizontal * Math.sin(azimuth),
+      )
+    }
+    world.addBody(body)
+    return body
+  })
+
+  const activeBodies = moving.map((index) => bodies[index])
+  const nudged = new Set()
+  let quietTime = 0
+  let elapsed = 0
+
+  function step(delta) {
+    world.step(STEP, delta, 12)
+    if (elapsed < 2 && elapsed + delta >= 2) {
+      world.defaultContactMaterial.restitution = 0.08
+      for (const body of activeBodies) {
+        body.linearDamping = 0.87
+        body.angularDamping = 0.91
+      }
+    }
+    elapsed += delta
+
+    const speedLimit = elapsed < 3 ? 0.07 : 0.15
+    const spinLimit = elapsed < 3 ? 0.1 : 0.16
+    const quiet = activeBodies.every(({ velocity, angularVelocity }) =>
+      velocity.lengthSquared() < speedLimit && angularVelocity.lengthSquared() < spinLimit,
+    )
+    quietTime = quiet ? quietTime + delta : 0
+    if (!settled()) return
+
+    for (const body of activeBodies) {
+      if (nudged.has(body) || upperFace(body.quaternion).alignment >= CLEAR_UPPER_FACE) continue
+      // A die wedged on an edge gets a small physical nudge before it is scored.
+      nudged.add(body)
+      body.wakeUp()
+      body.velocity.set((random() - 0.5) * 2, 1.7, (random() - 0.5) * 2)
+      body.angularVelocity.set((random() - 0.5) * 10, 0, (random() - 0.5) * 10)
+      quietTime = 0
+    }
+  }
+
+  function settled() {
+    return quietTime >= REST_TIME
+  }
+
+  function finish() {
+    // Finish the same simulation without rendering frames when motion is reduced.
+    for (let tick = 0; tick < 720 && !settled(); tick++) step(STEP)
+    return settled()
+  }
+
+  return { bodies, step, settled, finish }
+}
