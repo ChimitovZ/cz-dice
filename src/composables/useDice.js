@@ -1,5 +1,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import rollUrl from '../assets/roll.mp3'
+import { createImpactAudio } from '../dice/impactAudio.js'
 import { rollDie } from './rollDie'
 
 const KEY = 'cz-dice-count'
@@ -42,12 +43,13 @@ export function useDice() {
   const outcome = ref({ win: false, double: false })
 
   const sum = computed(() => values.value.reduce((a, b) => a + b, 0))
+  const impactAudio = createImpactAudio()
 
   let settleTimer = 0
   let physicsReady = false
   let snd
 
-  function playRoll() {
+  function playFallbackRoll() {
     if (!snd) snd = new Audio(rollUrl)
     snd.currentTime = 0
     snd.play().catch(() => {})
@@ -97,7 +99,7 @@ export function useDice() {
 
   function startRoll(entry, duration) {
     const instant = reduceMotion()
-    playRoll()
+    if (!physicsReady || instant || !impactAudio.unlock()) playFallbackRoll()
     if (!physicsReady) {
       const next = values.value.map((value, index) =>
         entry.kind === 'roll' || index === entry.index ? rollDie() : value,
@@ -220,7 +222,10 @@ export function useDice() {
     if (Number.isInteger(saved) && saved >= MIN && saved <= MAX) applyCount(saved, false)
   })
 
-  onUnmounted(stopAnim)
+  onUnmounted(() => {
+    stopAnim()
+    impactAudio.dispose()
+  })
 
   return reactive({
     count,
@@ -235,6 +240,7 @@ export function useDice() {
     motion,
     cancelMotion,
     settleMotion,
+    playImpact: impactAudio.play,
     setPhysicsReady: (ready) => { physicsReady = ready },
     outcome,
     min: MIN,

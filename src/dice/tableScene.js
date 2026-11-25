@@ -253,7 +253,7 @@ export function createTableScene(canvas) {
     } else collect()
   }
 
-  function play(motion, values, done) {
+  function play(motion, values, done, onImpact) {
     if (motion.kind === 'turn') {
       const from = [...values]
       from[motion.index] = motion.from[motion.index]
@@ -264,7 +264,9 @@ export function createTableScene(canvas) {
 
     const moving = motion.kind === 'roll' ? values.map((_, index) => index) : [motion.index]
     show(values)
-    const physics = createTablePhysics(dice.map(({ mesh }) => mesh), moving, bounds)
+    const physics = createTablePhysics(dice.map(({ mesh }) => mesh), moving, bounds, {
+      onImpact: motion.instant ? undefined : onImpact,
+    })
     if (motion.instant) {
       physics.finish()
       finishRoll(physics, moving, values, true, done)

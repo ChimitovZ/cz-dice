@@ -86,7 +86,7 @@ function syncScene() {
       tableScene.play(motion, values, (faces) => {
         if (faces === null) dice.cancelMotion(motion)
         else dice.settleMotion(motion, faces)
-      })
+      }, dice.playImpact)
     }
     else tableScene.show(values)
   } else if (resized || newValues) {

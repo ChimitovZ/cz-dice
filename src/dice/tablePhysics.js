@@ -7,8 +7,41 @@ const X = new Vec3(1, 0, 0)
 const Y = new Vec3(0, 1, 0)
 const CLEAR_UPPER_FACE = 0.74
 const REST_TIME = 0.16
+const MIN_IMPACT_SPEED = 0.9
+const IMPACT_COOLDOWN_STEPS = 6
 
-export function createTablePhysics(poses, moving, bounds, random = Math.random) {
+function watchImpacts(world, activeBodies, dice, floor, halfWidth, onImpact) {
+  const diceBodies = new Set(dice)
+  const hits = new Map()
+  const lastHit = new Map()
+
+  for (const body of activeBodies) {
+    body.addEventListener('collide', ({ body: other, contact }) => {
+      const speed = contact.getImpactVelocityAlongNormal()
+      if (speed < MIN_IMPACT_SPEED) return
+      const key = `${Math.min(body.id, other.id)}:${Math.max(body.id, other.id)}`
+      const step = world.stepnumber
+      if (step - (lastHit.get(key) ?? -Infinity) < IMPACT_COOLDOWN_STEPS) return
+      if (speed <= (hits.get(key)?.speed ?? 0)) return
+
+      const kind = other === floor ? 'felt' : diceBodies.has(other) ? 'dice' : 'rail'
+      const x = contact.bi.position.x + contact.ri.x
+      const pan = Math.max(-1, Math.min(1, x / halfWidth))
+      hits.set(key, { kind, speed, pan, step })
+    })
+  }
+
+  return () => {
+    // A single hit can have several contact points and be reported by both dice.
+    for (const [key, { kind, speed, pan, step }] of hits) {
+      lastHit.set(key, step)
+      onImpact(kind, speed, pan)
+    }
+    hits.clear()
+  }
+}
+
+export function createTablePhysics(poses, moving, bounds, { random = Math.random, onImpact } = {}) {
   const world = new World({ gravity: new Vec3(0, -27, 0), allowSleep: true })
   world.defaultContactMaterial.friction = 0.4
   world.defaultContactMaterial.restitution = 0.48
@@ -18,9 +51,10 @@ export function createTablePhysics(poses, moving, bounds, random = Math.random) 
     const surface = new Body({ shape: new Plane(), position: new Vec3(x, y, z) })
     surface.quaternion.setFromAxisAngle(axis, angle)
     world.addBody(surface)
+    return surface
   }
 
-  addPlane(0, 0, 0, X, -FLAT)
+  const floor = addPlane(0, 0, 0, X, -FLAT)
   addPlane(-bounds.halfWidth, 0, 0, Y, FLAT)
   addPlane(bounds.halfWidth, 0, 0, Y, -FLAT)
   addPlane(0, 0, bounds.back, Y, 0)
@@ -63,12 +97,14 @@ export function createTablePhysics(poses, moving, bounds, random = Math.random) 
   })
 
   const activeBodies = moving.map((index) => bodies[index])
+  const flushImpacts = onImpact && watchImpacts(world, activeBodies, bodies, floor, bounds.halfWidth, onImpact)
   const nudged = new Set()
   let quietTime = 0
   let elapsed = 0
 
   function step(delta) {
     world.step(STEP, delta, 12)
+    flushImpacts?.()
     if (elapsed < 2 && elapsed + delta >= 2) {
       world.defaultContactMaterial.restitution = 0.08
       for (const body of activeBodies) {
