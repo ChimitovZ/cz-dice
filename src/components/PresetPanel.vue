@@ -1,7 +1,12 @@
 <script setup>
-import { computed, inject, nextTick, ref } from 'vue'
+import { inject, nextTick, ref } from 'vue'
 
 const STORAGE_KEY = 'cz-dice-presets'
+const quickRolls = [
+  { count: 1, label: '1 кубик' },
+  { count: 2, label: '2 кубика' },
+  { count: 3, label: '3 кубика' },
+]
 const dice = inject('dice')
 
 function validPreset(preset) {
@@ -15,7 +20,7 @@ function loadPresets() {
     if (Array.isArray(saved)) {
       return saved
         .filter((preset) => validPreset(preset) && Number.isSafeInteger(preset.id))
-        .map(({ id, name, count, favorite }) => ({ id, name, count, favorite }))
+        .map(({ id, name, count }) => ({ id, name, count }))
     }
   } catch {
     // Presets can still be used for this session when storage is unavailable.
@@ -24,7 +29,6 @@ function loadPresets() {
 }
 
 const presets = ref(loadPresets())
-const favorites = computed(() => presets.value.filter((preset) => preset.favorite))
 const dialog = ref(null)
 const nameInput = ref(null)
 const newButton = ref(null)
@@ -53,7 +57,7 @@ function rollPreset(preset) {
 
 async function editPreset(preset = null) {
   draft.value = preset ? { ...preset } : {
-    id: null, name: '', count: 2, favorite: true,
+    id: null, name: '', count: 2,
   }
   await nextTick()
   nameInput.value?.focus()
@@ -89,21 +93,19 @@ function removeDraft() {
 </script>
 
 <template>
-  <section class="preset-panel" aria-label="Пресеты бросков">
+  <section class="preset-panel" aria-labelledby="quick-rolls-title">
     <div class="preset-header">
-      <h2>Избранное</h2>
+      <h2 id="quick-rolls-title">Быстрые броски</h2>
       <button type="button" class="button" @click="openManager">
         {{ presets.length ? 'Управление пресетами' : 'Добавить пресет' }}
       </button>
     </div>
-    <div v-if="favorites.length" class="favorites">
-      <button v-for="preset in favorites" :key="preset.id" class="quick-roll" type="button"
-        :aria-label="`Бросить ${preset.name} (${formula(preset)})`" :aria-disabled="dice.rolling" @click="rollPreset(preset)">
-        <span class="quick-name">{{ preset.name }}</span>
-        <span class="formula">{{ formula(preset) }}</span>
+    <div class="quick-rolls">
+      <button v-for="{ count, label } in quickRolls" :key="count" class="quick-roll" type="button"
+        :aria-label="`Бросить ${label}`" :disabled="dice.rolling" @click="dice.roll(count)">
+        {{ label }}
       </button>
     </div>
-    <p v-else-if="presets.length" class="hint">Добавьте пресет в избранное, чтобы бросать отсюда.</p>
     <p v-if="storageFailed" class="hint" role="alert">Изменения доступны до закрытия страницы. Браузер не сохранил пресеты.</p>
 
     <dialog ref="dialog" class="manager" aria-labelledby="preset-manager-title" @close="draft = null">
@@ -121,10 +123,6 @@ function removeDraft() {
           Количество кубиков d6
           <input v-model.number="draft.count" type="number" :min="dice.min" :max="dice.max" step="1" required />
         </label>
-        <label class="favorite-field">
-          <input v-model="draft.favorite" type="checkbox" />
-          В избранное
-        </label>
         <div class="actions">
           <button type="submit" class="button primary" :disabled="!validPreset(draft)">Сохранить</button>
           <button type="button" class="button" @click="showList">Назад</button>
@@ -137,7 +135,7 @@ function removeDraft() {
           <li v-for="preset in presets" :key="preset.id">
             <div class="preset-info">
               <strong>{{ preset.name }}</strong>
-              <span class="formula">{{ formula(preset) }}{{ preset.favorite ? ' · В избранном' : '' }}</span>
+              <span class="formula">{{ formula(preset) }}</span>
             </div>
             <div class="actions">
               <button type="button" class="button" :aria-label="`Бросить ${preset.name}`" :disabled="dice.rolling" @click="rollPreset(preset)">Бросить</button>
@@ -184,41 +182,26 @@ h2 {
   padding: 0.35rem 0.65rem;
 }
 
-.button:hover:not(:disabled), .quick-roll:hover:not([aria-disabled='true']) { border-color: var(--gold-hi); }
-.button:disabled { opacity: 0.55; cursor: default; }
+.button:hover:not(:disabled), .quick-roll:hover:not(:disabled) { border-color: var(--gold-hi); }
+.button:disabled, .quick-roll:disabled { opacity: 0.55; cursor: default; }
 .preset-header .button { border-color: transparent; background: transparent; color: var(--muted); }
 .primary { background: var(--gold-hi); color: var(--accent-ink); }
 .remove { margin-inline-start: auto; color: var(--ivory); background: var(--red-lo); }
 
-.favorites {
-  display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
-  padding: 4px;
-  margin-inline: -4px;
-  scrollbar-width: thin;
+.quick-rolls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  max-width: 24rem;
+  padding-block: 0.25rem;
 }
 
 .quick-roll {
-  flex: 0 0 auto;
-  display: grid;
-  justify-items: start;
-  gap: 0.12rem;
-  min-width: 5rem;
-  max-width: 11rem;
-  text-align: start;
+  padding-inline: 0.2rem;
   transition: transform 120ms ease, border-color 120ms ease;
 }
 
-.quick-roll:active:not([aria-disabled='true']) { transform: scale(0.96); }
-.quick-roll[aria-disabled='true'] { cursor: wait; }
-
-.quick-name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.quick-roll:active:not(:disabled) { transform: scale(0.96); }
 
 .formula, .hint { color: var(--muted); font-size: 0.78rem; }
 .formula { font-variant-numeric: tabular-nums; }
@@ -226,7 +209,7 @@ h2 {
 
 @media (prefers-reduced-motion: reduce) {
   .quick-roll { transition: none; }
-  .quick-roll:active:not([aria-disabled='true']) { transform: none; }
+  .quick-roll:active:not(:disabled) { transform: none; }
 }
 
 .manager {
@@ -245,10 +228,7 @@ h2 {
 .editor { display: grid; gap: 0.7rem; margin-top: 0.7rem; }
 .editor > .primary { justify-self: start; }
 .editor label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
-.editor label.favorite-field { display: flex; align-items: center; min-height: 44px; gap: 0.4rem; }
-.favorite-field input { width: 1.1rem; height: 1.1rem; accent-color: var(--gold-hi); }
-
-.editor input:not([type='checkbox']) {
+.editor input {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -273,11 +253,4 @@ h2 {
 }
 
 .preset-info { display: grid; min-width: 0; overflow-wrap: anywhere; }
-
-@media (orientation: landscape) and (max-height: 480px) {
-  .preset-panel { display: flex; flex-direction: column; }
-  .preset-header { flex: none; }
-  .favorites { flex-wrap: wrap; min-height: 0; overflow: auto; }
-  .quick-roll { flex: 1 1 5rem; max-width: 100%; }
-}
 </style>
