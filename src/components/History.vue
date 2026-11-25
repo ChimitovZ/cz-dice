@@ -77,7 +77,7 @@ onBeforeUnmount(() => {
 
             <ul class="rows">
               <li v-if="!rows.length" class="empty">
-                Пока пусто. Бросьте стол или зажмите кубик — всё, что изменилось, появится здесь.
+                Пока пусто. Здесь появятся броски и изменения на столе.
               </li>
               <li v-for="row in rows" :key="row.id" :class="['row', row.kind]">
                 <div class="line">

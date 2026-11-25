@@ -79,7 +79,7 @@ const pickerOpen = computed(() => dice.picker >= 0)
 </script>
 
 <template>
-  <section ref="board" class="board" @click.self="dice.roll">
+  <section ref="board" class="board" @click.self="dice.roll()">
     <Die
       v-for="(v, i) in dice.shown"
       :key="i"

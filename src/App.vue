@@ -4,14 +4,13 @@ import { useDice } from './composables/useDice'
 import DiceBoard from './components/DiceBoard.vue'
 import Controls from './components/Controls.vue'
 import History from './components/History.vue'
+import PresetPanel from './components/PresetPanel.vue'
 
 const dice = useDice()
 provide('dice', dice)
 
-// Both flags come from the settled throw (see `outcome` in useDice), never
-// from the flickering faces: a lucky frame mid-roll must not flash the board.
+// Celebration uses the outcome after the dice have settled.
 const tableWin = computed(() => !dice.rolling && dice.outcome.win)
-
 const tableDouble = computed(() => !dice.rolling && dice.outcome.double)
 
 function cubesMark(n) {
@@ -27,9 +26,8 @@ function cubesMark(n) {
 
 function onKey(e) {
   if (e.code !== 'Space' && e.code !== 'Enter') return
-  if (e.repeat || e.shiftKey) return
-  const tag = e.target?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+  if (e.defaultPrevented || e.repeat || e.shiftKey) return
+  if (e.target?.isContentEditable || e.target?.closest?.('button, input, select, textarea, dialog')) return
   if (dice.picker >= 0) return
   e.preventDefault()
   dice.roll()
@@ -48,6 +46,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <span><i class="dot hold" aria-hidden="true" />зажать — грань</span>
       </p>
     </header>
+    <PresetPanel class="presets" />
     <div
       class="table"
       :class="{ win: tableWin, double: tableDouble }"
@@ -76,11 +75,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <span class="sum-lab">Сумма</span>
       <span class="sum-n">{{ dice.displaySum }}</span>
     </p>
-    <Log class="feed" />
     <div class="foot">
       <div class="dock">
         <Controls />
-        <button class="throw" type="button" :disabled="dice.rolling" @click="dice.roll">
+        <button class="throw" type="button" :disabled="dice.rolling" @click="dice.roll()">
           <span class="gleam" aria-hidden="true" />
           Бросить
         </button>
@@ -94,7 +92,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 .app {
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto auto minmax(9rem, 1fr) auto auto;
+  overflow-y: auto;
   gap: 0.4rem;
   padding: calc(0.55rem + var(--safe-t)) calc(0.7rem + var(--safe-r)) calc(0.55rem + var(--safe-b)) calc(0.7rem + var(--safe-l));
   background: radial-gradient(120% 70% at 50% 0%, #1a120c, var(--bg) 62%);
@@ -408,6 +407,7 @@ h1 {
     background: transparent;
   }
   .bulb { animation: none; opacity: 0.35; }
+  .sum.pulse .sum-n { animation: none; }
   .sparks,
   .gleam { display: none; }
 }
@@ -431,7 +431,17 @@ h1 {
 }
 
 @media (orientation: landscape) and (max-height: 480px) {
-  .app { gap: 0.24rem; }
+  .app {
+    grid-template-columns: minmax(0, 1fr) clamp(11rem, 31vw, 19rem);
+    grid-template-rows: auto minmax(7rem, 1fr) auto auto;
+    grid-template-areas: 'top top' 'table presets' 'sum presets' 'foot presets';
+    gap: 0.24rem 0.55rem;
+  }
+  .top { grid-area: top; }
+  .presets { grid-area: presets; overflow: auto; }
+  .table { grid-area: table; }
+  .sum { grid-area: sum; }
+  .foot { grid-area: foot; }
   .sum { width: min(100%, 12rem); padding: 0.22rem 0.7rem 0.28rem; }
   .sum-n { font-size: 1.7rem; }
   .throw { min-height: 48px; font-size: 1rem; border-radius: 14px; }

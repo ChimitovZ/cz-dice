@@ -45,7 +45,8 @@ export function describeChange(entry) {
     all.push({ from: entry.from[entry.index], to: entry.to[entry.index] })
   } else if (entry.kind === 'roll') {
     for (let i = 0; i < entry.to.length; i++) {
-      if (entry.from[i] !== entry.to[i]) all.push({ label: `№${i + 1}`, from: entry.from[i], to: entry.to[i] })
+      if (i >= entry.from.length) all.push({ label: `№${i + 1}`, note: 'добавлен', to: entry.to[i] })
+      else if (entry.from[i] !== entry.to[i]) all.push({ label: `№${i + 1}`, from: entry.from[i], to: entry.to[i] })
     }
   } else {
     const added = entry.to.length > entry.from.length

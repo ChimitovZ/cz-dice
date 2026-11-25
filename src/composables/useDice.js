@@ -1,21 +1,11 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import rollUrl from '../assets/roll.mp3'
+import { rollDie } from './rollDie'
 
 const KEY = 'cz-dice-count'
 const MIN = 1
 const MAX = 12
 const HIST = 20
-
-function d6() {
-  const buf = new Uint32Array(1)
-  const limit = Math.floor(0x100000000 / 6) * 6
-  let x
-  do {
-    crypto.getRandomValues(buf)
-    x = buf[0]
-  } while (x >= limit)
-  return 1 + (x % 6)
-}
 
 function duration() {
   const buf = new Uint32Array(1)
@@ -95,6 +85,14 @@ export function useDice() {
     flicker = 0
   }
 
+  function saveCount(n) {
+    try {
+      localStorage.setItem(KEY, String(n))
+    } catch {
+      // Keep the game playable when storage is unavailable.
+    }
+  }
+
   /**
    * Resizes the table. The faces already on the felt are kept,
    * extra dice are rolled in, and the switch lands in the journal.
@@ -105,13 +103,13 @@ export function useDice() {
     picker.value = -1
     outcome.value = { win: false, double: false }
     const before = [...values.value]
-    const next = Array.from({ length: n }, (_, i) => values.value[i] ?? d6())
+    const next = Array.from({ length: n }, (_, i) => values.value[i] ?? rollDie())
     count.value = n
     values.value = next
     shown.value = [...next]
     displaySum.value = total(next)
     if (persist) {
-      localStorage.setItem(KEY, String(n))
+      saveCount(n)
       commit({ kind: 'count', from: before, to: next })
     }
   }
@@ -142,14 +140,18 @@ export function useDice() {
     outcome.value = { win: same || totalAll, double: same }
   }
 
-  function roll() {
+  function roll(nextCount = count.value) {
     if (rolling.value) return
     stopAnim()
     picker.value = -1
     outcome.value = { win: false, double: false }
     const before = [...values.value]
-    const next = Array.from({ length: count.value }, d6)
+    const next = Array.from({ length: nextCount }, rollDie)
     const sumNow = total(next)
+    if (nextCount !== count.value) {
+      count.value = nextCount
+      saveCount(nextCount)
+    }
     values.value = next
     displaySum.value = sumNow
     pulse.value += 1
@@ -163,10 +165,11 @@ export function useDice() {
     }
 
     rolling.value = true
+    shown.value = Array.from({ length: nextCount }, (_, index) => before[index] ?? rollDie())
     const ms = duration()
     const start = performance.now()
     flicker = setInterval(() => {
-      shown.value = shown.value.map(() => d6())
+      shown.value = shown.value.map(() => rollDie())
     }, 48)
 
     const tick = (now) => {
@@ -187,7 +190,7 @@ export function useDice() {
     outcome.value = { win: false, double: false }
     const before = [...values.value]
     const next = [...before]
-    next[i] = d6()
+    next[i] = rollDie()
     const sumNow = total(next)
     values.value = next
     shown.value = [...next]
@@ -211,7 +214,7 @@ export function useDice() {
         if (now - last > 60) {
           last = now
           const f = shown.value.slice()
-          f[i] = d6()
+          f[i] = rollDie()
           shown.value = f
         }
         raf = requestAnimationFrame(tick)
