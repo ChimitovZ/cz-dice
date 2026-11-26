@@ -20,6 +20,7 @@ const props = defineProps({
   rolling: { type: Boolean, default: false },
   size: { type: Number, default: 72 },
   interactive: { type: Boolean, default: true },
+  flat: { type: Boolean, default: false },
   flash: { type: Boolean, default: false },
   rendered: { type: Boolean, default: false },
   motion: { type: Object, default: null },
@@ -30,6 +31,7 @@ const emit = defineEmits(['tap', 'long'])
 const pressed = ref(false)
 const cube = ref(null)
 const face = computed(() => FACES[props.value])
+const sides = computed(() => props.flat ? { [props.value]: face.value } : FACES)
 const shown = computed(() => {
   if (!props.motion || props.motion.kind === 'turn') return props.value
   return props.motion.from[props.index] ?? 1
@@ -172,11 +174,11 @@ onBeforeUnmount(() => {
     @keydown="onKey"
   >
     <span class="glow" aria-hidden="true" />
-    <div class="scene" aria-hidden="true">
+    <div class="scene" :class="{ flat }" aria-hidden="true">
       <div v-if="!rendered" class="view">
-        <div ref="cube" class="cube" :style="{ transform: pose(face.x, face.y) }">
+        <div ref="cube" class="cube" :style="{ transform: flat ? 'none' : pose(face.x, face.y) }">
           <div
-            v-for="(side, n) in FACES"
+            v-for="(side, n) in sides"
             :key="n"
             class="die-face"
             :class="{ front: side === face, shaded: Number(n) === face.side }"
@@ -331,6 +333,27 @@ onBeforeUnmount(() => {
 
 .shaded .pip {
   background: var(--ivory-dim);
+}
+
+.scene.flat::before {
+  content: none;
+}
+
+.flat .view {
+  width: 88%;
+  transform: none;
+}
+
+.flat .die-face {
+  border-radius: 16%;
+  transform: none;
+  background: var(--red);
+  box-shadow: none;
+}
+
+.flat .pip {
+  width: 58%;
+  box-shadow: none;
 }
 
 .chip {

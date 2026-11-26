@@ -79,7 +79,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true))
               :aria-pressed="face === current"
               @click="pick(face)"
             >
-              <Die :value="face" :size="size" :interactive="false" />
+              <Die :value="face" :size="size" :interactive="false" flat aria-hidden="true" />
             </button>
           </div>
           <p class="hint">Грань, на которой кубик сейчас, обведена золотом</p>

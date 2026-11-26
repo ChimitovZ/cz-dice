@@ -3,6 +3,8 @@ import { upperFace } from './faces.js'
 
 const STEP = 1 / 120
 const FLAT = Math.PI / 2
+const TUMBLE_CLEARANCE = 0.87 // Half the die's diagonal, rounded up.
+const LIFT_STEPS = 11
 const X = new Vec3(1, 0, 0)
 const Y = new Vec3(0, 1, 0)
 const CLEAR_UPPER_FACE = 0.74
@@ -62,12 +64,19 @@ export function createTablePhysics(poses, moving, bounds, { random = Math.random
 
   const direction = random() * 2 * Math.PI
   const box = new Box(new Vec3(0.5, 0.5, 0.5))
+  const launchHalfWidth = Math.max(0, bounds.halfWidth - TUMBLE_CLEARANCE)
+  const launchDepthInset = Math.min(TUMBLE_CLEARANCE, (bounds.front - bounds.back) / 2)
+  const launchVelocities = []
   const bodies = poses.map(({ position, quaternion }, index) => {
     const active = moving.includes(index)
     const body = new Body({
       shape: box,
       mass: active ? 1 : 0,
-      position: new Vec3(position.x, active ? 0.6 : position.y, position.z),
+      position: active ? new Vec3(
+        Math.max(-launchHalfWidth, Math.min(launchHalfWidth, position.x)),
+        0.9,
+        Math.max(bounds.back + launchDepthInset, Math.min(bounds.front - launchDepthInset, position.z)),
+      ) : new Vec3(position.x, position.y, position.z),
       linearDamping: 0.34,
       angularDamping: 0.46,
       sleepSpeedLimit: 0.35,
@@ -79,14 +88,15 @@ export function createTablePhysics(poses, moving, bounds, { random = Math.random
     if (active) {
       const angle = direction + (random() - 0.5) * 1.15
       const speed = 5.2 + random() * 3.5
-      body.velocity.set(
-        Math.cos(angle) * speed - position.x * 1.05,
-        4.7 + random() * 1.6,
-        Math.sin(angle) * speed - position.z * 1.05,
-      )
-      const spin = 14 + random() * 10
+      launchVelocities.push({
+        body,
+        x: Math.cos(angle) * speed - position.x * 1.05,
+        z: Math.sin(angle) * speed - position.z * 1.05,
+      })
+      body.velocity.y = 4.7 + random() * 1.6
+      const spin = 20 + random() * 10
       const azimuth = random() * 2 * Math.PI
-      const vertical = 2 * random() - 1
+      const vertical = (random() - 0.5) * 0.9
       const horizontal = Math.sqrt(1 - vertical * vertical)
       body.angularVelocity.set(
         spin * horizontal * Math.cos(azimuth), spin * vertical, spin * horizontal * Math.sin(azimuth),
@@ -95,6 +105,17 @@ export function createTablePhysics(poses, moving, bounds, { random = Math.random
     world.addBody(body)
     return body
   })
+
+  // Give the dice time to turn over before they travel into their neighbors.
+  function releaseLaunch() {
+    if (world.stepnumber !== LIFT_STEPS) return
+    for (const { body, x, z } of launchVelocities) {
+      body.velocity.x += x
+      body.velocity.z += z
+    }
+    world.removeEventListener('postStep', releaseLaunch)
+  }
+  world.addEventListener('postStep', releaseLaunch)
 
   const activeBodies = moving.map((index) => bodies[index])
   const flushImpacts = onImpact && watchImpacts(world, activeBodies, bodies, floor, bounds.halfWidth, onImpact)
